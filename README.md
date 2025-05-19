@@ -36,7 +36,7 @@ If you want to train your own VAE from the beginning, follow [LDM-VAE](https://g
 
 ## Train
 
-Train MAD-AD with the following command:
+Train REFLECT with the following command:
 
 ```bash
 torchrun train_REFLECT.py \
