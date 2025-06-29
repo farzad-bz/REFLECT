@@ -3,7 +3,7 @@
 **A PyTorch Implementation for Unsupervised Brain Anomaly Detection**
 
 This repository hosts the official PyTorch implementation for our paper accepted in MICCAI2025:  
-"REFLECT: Rectified Flows for Efficient Brain Anomaly Correction Transport.
+"REFLECT: Rectified Flows for Efficient Brain Anomaly Correction Transport".
 
 ---
 
