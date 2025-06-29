@@ -1,42 +1,75 @@
-# REFLECT
-This Repository contains the PyTorch implementation of the paper titled: "REFLECT: Rectified Flows for Efficient Brain Anomaly Correction Transport.".
 
-## Setup
+# ✨ REFLECT ✨
+**A PyTorch Implementation for Unsupervised Brain Anomaly Detection**
 
-### Environment
+This repository hosts the official PyTorch implementation for our paper accepted in MICCAI2025:  
+"REFLECT: Rectified Flows for Efficient Brain Anomaly Correction Transport.
 
-We utilize the `Python 3.11` interpreter in our experiments. Install the required packages using the following command:
+---
+
+## 🎨 Approach
+
+![REFLECT Method](./assets/method.png)
+
+---
+
+## ⚙️ Setup
+
+### 🛠️ Environment
+
+Our experiments run on **Python 3.11**. Install all the required packages by executing:
+
 ```bash
 pip3 install -r requirements.txt
 ```
 
-### Datasets
-Prepare your data by registering to MNI_152_1mm and preprocessing, normalization, and extracting axial slices. Ensure that the training and validation sets consist only of normal, healthy data, while the test set should contain abnormal slices. Organize the files using the following structure:
-```
-├── Data
-    ├── train
-    │   ├── brain_scan_{train_image_id}_slice_{slice_idx}_{modality}.png
-    │   ├── brain_scan_{train_image_id}_slice_{slice_idx}_brainmask.png
-    │   └── ...
-    ├── val
-    │   ├── brain_scan_{val_image_id}_slice_{slice_idx}_{modality}.png
-    │   ├── brain_scan_{val_image_id}_slice_{slice_idx}_brainmask.png
-    │   └── ...
-    └── test
-    │   ├── brain_scan_{test_image_id}_slice_{slice_idx}_{modality}.png
-    │   ├── brain_scan_{test_image_id}_slice_{slice_idx}_brainmask.png
-    │   ├── brain_scan_{test_image_id}_slice_{slice_idx}_segmentation.png
-        └── ...
+### 📁 Datasets
 
-```
+Prepare your data as follows:
 
-## train and fine-tune VAE
+1. **Data Registration & Preprocessing:**  
+   - Register with MNI_152_1mm.
+   - Preprocess, normalize, pad and extract axial slices.
 
-If you want to train your own VAE from the beginning, follow [LDM-VAE](https://github.com/CompVis/latent-diffusion?tab=readme-ov-file#training-autoencoder-models).  Also, we have adapted and finetuned the RGB pre-trained models for 1-channel medical brain images, and we provide access to trained VAE model soon...
+2. **Dataset Organization:**  
+   - Ensure **training** and **validation** sets contain only normal, healthy data.
+   - **Test** set should include abnormal slices.
+   - Organize your files using this structure:
 
-## Train
+   ```
+   ├── Data
+       ├── train
+       │   ├── brain_scan_{train_image_id}_slice_{slice_idx}_{modality}.png
+       │   ├── brain_scan_{train_image_id}_slice_{slice_idx}_brainmask.png
+       │   └── ...
+       ├── val
+       │   ├── brain_scan_{val_image_id}_slice_{slice_idx}_{modality}.png
+       │   ├── brain_scan_{val_image_id}_slice_{slice_idx}_brainmask.png
+       │   └── ...
+       └── test
+           ├── brain_scan_{test_image_id}_slice_{slice_idx}_{modality}.png
+           ├── brain_scan_{test_image_id}_slice_{slice_idx}_brainmask.png
+           ├── brain_scan_{test_image_id}_slice_{slice_idx}_segmentation.png
+           └── ...
+   ```
 
-Train REFLECT with the following command:
+---
+
+## 🔧 Pretrained Weights & VAE Fine-Tuning
+
+### Pretrained VAE Models
+
+To jumpstart your experiments, we provide pretrained weights adapted for 1-channel medical brain images. These models are available on [HuggingFace](https://huggingface.co/farzadbz/Medical-VAE).
+
+### Train & Fine-Tune VAE
+
+If you prefer to train your own VAE from scratch, please refer to the [LDM-VAE repository](https://github.com/CompVis/latent-diffusion?tab=readme-ov-file#training-autoencoder-models) for detailed instructions.
+
+---
+
+## 🚄 Training REFLECT
+
+To train REFLECT, run the following command. This configuration leverages a UNet_L model with data augmentation and integrates the pretrained VAE:
 
 ```bash
 torchrun train_REFLECT.py \
@@ -48,3 +81,9 @@ torchrun train_REFLECT.py \
             --ckpt-every 0 
 ```
 
+---
+
+## 📸 Sample Results
+
+
+![Sample Results](./assets/results.png)
