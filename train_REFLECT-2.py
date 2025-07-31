@@ -1,14 +1,5 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
 
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
-"""
-A minimal training script for DiT using PyTorch DDP.
-"""
 import torch
-# the first flag below was False when we tested this script but True makes A100 training a lot faster:
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 import torch.distributed as dist
@@ -37,7 +28,6 @@ from medical_models import UNET_models
 from transformers import get_cosine_schedule_with_warmup
 from MedicalDataLoader import BraTS2021Dataset, ATLASDataset
 from huggingface_hub import hf_hub_download
-import wandb
 
 
 import torch.nn as nn
@@ -72,14 +62,10 @@ def create_logger_and_dirs(args):
     """
     if dist.get_rank() == 0:
 
-        wandb_logger = wandb.init(entity='beizaeefarzad-cole-de-technologie-sup-rieure', project='RFAD-Medical', config=args, tags=['Second_v', 'BraTS', args.model_size ,args.modality, args.vae],
-                    notes=f'2-RFAD_{args.vae}_{args.modality}_{args.model_size}')
-        
-        args.wand_run_id = wandb.run.id
         os.makedirs(args.results_dir, exist_ok=True)  # Make results folder (holds all experiment subfolders)
         experiment_index = len(glob(f"{args.results_dir}/*"))
         model_string_name = f'{args.model_size}-{args.modality}'
-        args.experiment_dir = f"{args.results_dir}/{experiment_index:03d}-{model_string_name}-{args.wand_run_id}"  # Create an experiment folder
+        args.experiment_dir = f"{args.results_dir}/{experiment_index:03d}-{model_string_name}"  # Create an experiment folder
         args.checkpoint_dir = f"{args.experiment_dir}/checkpoints"  # Stores saved model checkpoints
         os.makedirs(args.checkpoint_dir, exist_ok=True)
         
@@ -94,8 +80,7 @@ def create_logger_and_dirs(args):
     else:  # dummy logger (does nothing)
         logger = logging.getLogger(__name__)
         logger.addHandler(logging.NullHandler())
-        wandb_logger = None
-    return logger, wandb_logger
+    return logger
 
 
 
@@ -105,10 +90,8 @@ def create_logger_and_dirs(args):
 
 def main(args):
     
-    job_starting_time = time()
-    new_job_submitted = False
     """
-    Trains a new DiT model.
+    Trains a new model.
     """
     assert torch.cuda.is_available(), "Training currently requires at least one GPU."
 
@@ -121,7 +104,7 @@ def main(args):
     torch.manual_seed(seed)
     torch.cuda.set_device(device)
     
-    logger, wandb_logger = create_logger_and_dirs(args)
+    logger = create_logger_and_dirs(args)
     
     logger.info(f"Starting rank={rank}, seed={seed}, world_size={dist.get_world_size()}.")
 
@@ -144,8 +127,6 @@ def main(args):
 
     # Create model:
     assert args.image_size % 8 == 0, "Image size must be divisible by 8 (for the VAE encoder)."
-    latent_size = args.image_size // 8
-    dictss = {}
     if args.vae == 'kl_f4':
         in_channels = out_channels = 3
     else:
@@ -155,9 +136,9 @@ def main(args):
     # if args.last_trained_epoch != 0 :
 
     try:
-        ckpt = sorted(glob(f'{args.results_dir.replace("Medical-second-RFAD", "Medical-RFAD")}/*/checkpoints/last.pt'))[-1]
+        ckpt = sorted(glob(f'{args.results_dir.replace("Medical-REFLECT-2_", "Medical-REFLECT")}/*/checkpoints/last.pt'))[-1]
     except:
-        ckpt = sorted(glob(f'{args.results_dir.replace("Medical-second-RFAD", "Medical-RFAD")}/*/*/checkpoints/last.pt'))[-1]
+        ckpt = sorted(glob(f'{args.results_dir.replace("Medical-REFLECT-2_", "Medical-REFLECT_")}/*/*/checkpoints/last.pt'))[-1]
     state_dict = torch.load(ckpt)['model']
     logger.info(model.load_state_dict(state_dict))
     logger.info('First velocity model loaded')
@@ -165,8 +146,7 @@ def main(args):
 
     first_velocity_model = deepcopy(model).to(device)  # Create an EMA of the model for use after training
     requires_grad(first_velocity_model, False)
-    
-    # Note that parameter initialization is done within the DiT constructor
+
     model = DDP(model.to(device), device_ids=[rank])
 
 
@@ -277,16 +257,10 @@ def main(args):
 
             # Log loss values:
             running_loss += loss.item()
-            # running_mt += loss_dict["mt_prediction"].mean().item()
             
             log_steps += 1
             train_steps += 1
             if train_steps % args.log_every == 0:
-                # if rank == 0: 
-                #     if (not new_job_submitted) and ((time() - job_starting_time) > 10000):
-                #         new_job_submitted = True 
-                #         os.system(f'sbatch train_job_{args.dataset}_{args.center_size}.sh')
-                
                 # Measure training speed:
                 torch.cuda.synchronize()
                 end_time = time()
@@ -297,14 +271,11 @@ def main(args):
                 avg_loss = avg_loss.item() / dist.get_world_size()
 
                 logger.info(f"(step={train_steps:07d}) MSE Loss: {avg_loss:.4f}, Train Steps/Sec: {steps_per_sec:.2f}")
-                if rank == 0: 
-                    wandb_logger.log({'Train MSE Loss': avg_loss})
                 # Reset monitoring variables:
                 running_loss = 0
                 log_steps = 0
                 start_time = time()
 
-            # Save DiT checkpoint:
         scheduler.step()
         
         if epoch % args.ckpt_every == 0 and epoch>0:
@@ -323,134 +294,11 @@ def main(args):
                     f.write(str(epoch))
 
 
-            
-
-    model.eval()  # important! This disables randomized embedding dropout
-    results = evaluation(model, vae, val_loader, args, logger, device=device, rank=rank)
-    print(results)
-
     logger.info("Done!")
     cleanup()
-    
-    
-    
-
-def calculate_metrics(ground_truth, prediction, device='cuda'):
-    flat_gt = ground_truth.flatten()
-    flat_pred = prediction.flatten()
-    
-
-    # auprc = metrics.AUPR()
-    # auprc_score = auprc(torch.from_numpy(flat_pred), torch.from_numpy(flat_gt.astype(int)))
-
-    # aupro = metrics.AUPRO(fpr_limit=0.3)
-    
-    auroc = metrics.AUROC()
-    auroc_score = auroc(torch.from_numpy(flat_pred).to(device), torch.from_numpy(flat_gt.astype(int)).to(device)).cpu().numpy()
-
-    f1max = metrics.F1Max()
-    f1_max_score = f1max(torch.from_numpy(flat_pred).to(device), torch.from_numpy(flat_gt.astype(int)).to(device)).cpu().numpy()
-    
-    # # Dice Coefficient (same as F1 score for binary)
-    # flat_gt = ground_truth.flatten()
-    # flat_pred = prediction.flatten().round()
-    # intersection = np.sum(flat_gt * flat_pred)
-    # dice = (2. * intersection) / (np.sum(flat_gt) + np.sum(flat_pred))
-    
-    ap = average_precision_score(ground_truth.flatten(), prediction.flatten())
-    
-    gt_list_sp = []
-    pr_list_sp = []
-    for idx in range(len(ground_truth)):
-        gt_list_sp.append(np.max(ground_truth[idx]))
-        sp_score = prediction[idx].max()
-            # else:
-            #     anomaly_map = anomaly_map.ravel()
-            #     sp_score = np.sort(anomaly_map)[-int(anomaly_map.shape[0] * max_ratio):]
-            #     sp_score = sp_score.mean()
-        pr_list_sp.append(sp_score)
-
-    gt_list_sp = np.array(gt_list_sp).astype(np.int32)
-    pr_list_sp = np.array(pr_list_sp)
-
-    # apsp = average_precision_score(gt_list_sp, pr_list_sp)
-    aurocsp = auroc(torch.from_numpy(pr_list_sp).to(device), torch.from_numpy(gt_list_sp).to(device)).cpu().numpy()
-    # f1sp = f1max(torch.from_numpy(pr_list_sp).to(device), torch.from_numpy(gt_list_sp).to(device)).cpu().numpy()
-    
-    return auroc_score ,f1_max_score, ap, aurocsp, 0, 0    
-
-    
-def evaluation(model, vae, val_loader, args, logger, device='cuda', rank=0, inference_steps=5):
-    dist.barrier()
-
-    auroc_score_s = []
-    f1_max_score_s = []
-    ap_s = []
-    aurocsp_s = []
-    apsp_s = []
-    f1sp_s = []
-
-    model.eval()
-
-    segmentation_s = []
-    encoded_s = []
-    latent_samples_s = []
-    # latent_size = 32
-
-    
-    for ii, (x, seg) in enumerate(val_loader):
-    # if ii%2==0:
-    #     continue
-    # x = x.repeat([num_iteration,1,1,1]).to(device)
-
-        with torch.no_grad():
-            # Map input images to latent space + normalize latents:
-            encoded = vae.encode(x.to(device)).mean.mul_(0.18215)
-            
-            latent_sample = encoded.clone()
-        # Euler solver (can use higher-order methods)
-            dt = 1 / inference_steps  # Step size (adjust for accuracy/speed tradeoff)
-            for time in torch.arange(0, 1, dt):
-                t = time * torch.ones((encoded.shape[0], 1)).to(torch.float32).to(device)
-                # velocity = model(encoded, t)
-                velocity = model(latent_sample, t)
-                latent_sample = latent_sample + velocity * dt
-            
-
-        segmentation_s += [_seg.unsqueeze(0) for _seg in seg]
-        encoded_s += [_encoded.unsqueeze(0) for _encoded in encoded]
-        latent_samples_s += [_latent_samples.unsqueeze(0) for _latent_samples in latent_sample]
-    pr = []   
-    gt = []
-    for segmentation, encoded, latent_sample in zip(segmentation_s, encoded_s, latent_samples_s):
-        latent_difference = (((((torch.abs(latent_sample-encoded))).to(torch.float32)).mean(axis=0)).detach().cpu().numpy().transpose(1,2,0).mean(axis=2))
-        # latent_difference = (np.clip(latent_difference, 0.0 , 0.4)) * 2.5
-        latent_difference = smooth_mask(latent_difference, sigma=1)
-        latent_difference = resize(latent_difference, (args.image_size, args.image_size))
-        pr.append(latent_difference)
-
-        gt.append(segmentation[0,:,:].cpu().numpy())
-    pr = np.stack(pr, axis=0)
-    gt = np.stack(gt, axis=0)
-    gt = (gt>0).astype(np.int32)
-    auroc_score ,f1_max_score, ap, aurocsp, apsp, f1sp = calculate_metrics(gt, pr, device=device)
-
-    auroc_score_s.append(np.round(auroc_score,4))
-    f1_max_score_s.append(np.round(f1_max_score,4))
-    ap_s.append(np.round(ap,4))
-    aurocsp_s.append(np.round(aurocsp,4))
-    apsp_s.append(np.round(apsp,4))
-    f1sp_s.append(np.round(f1sp,4))
-    
-    results = {'auroc':np.mean(auroc_score_s),'f1_max':np.mean(f1_max_score_s), 'ap':np.mean(ap_s), 'aurocsp':np.mean(aurocsp_s), 'apsp':np.mean(apsp_s), 'f1sp':np.mean(f1sp_s)}
-    if torch.distributed.get_rank() == 0:
-        logger.info(f'Validation: {results}')
-    model.train()
-    dist.barrier()
-    return results
 
 if __name__ == "__main__":
-    # Default args here will train DiT-XL/2 with the hyperparameters we used in our paper (except training iters).
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, choices=['BraTS2021', 'ATLAS2'], default="BraTS2021")
     parser.add_argument("--model_size", type=str, choices=['UNet_XS', 'UNet_S', 'UNet_M', 'UNet_L', 'UNet_XL'], default="UNet_M")
@@ -472,5 +320,5 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     args.last_trained_epoch = 0
-    args.results_dir = f"./results_Medical-REFLECT-2_{args.dataset}_{args.model_size}_{args.modality}_{args.image_size}_{args.vae}_with_augmentation"
+    args.results_dir = f"./results_Medical-REFLECT-2_{args.dataset}_{args.model_size}_{args.modality}_{args.image_size}_{args.vae}"
     main(args)
