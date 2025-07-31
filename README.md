@@ -71,7 +71,7 @@ If you prefer to train your own VAE from scratch, please refer to the [LDM-VAE r
 
 The training script requires a precomputed **DTD embedding** file.
 
-- **Download the DTD embeddings based on your desired vae model (klf4 or klf8)**:
+- **Download the DTD embeddings based on your desired VAE model (klf4 or klf8)**:
  [klf8 dtd embeddings](https://drive.google.com/file/d/1I7jmzsHxC5IBm719dNVpWl5_zGFSVsM4/view?usp=share_link).
  [klf4 dtd embeddings](https://drive.google.com/file/d/1zTwLiI3CdJmt4vWUt65eGWY5s0OAxZzf/view?usp=share_link).
 - **Copy the downloaded file** to the directory you specify with the `--data-dir` argument.
