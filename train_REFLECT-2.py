@@ -36,7 +36,7 @@ from scipy.ndimage import gaussian_filter
 from medical_models import UNET_models
 from transformers import get_cosine_schedule_with_warmup
 from MedicalDataLoader import BraTS2021Dataset, ATLASDataset
-from ldm.models.autoencoder import  AutoencoderKL
+from huggingface_hub import hf_hub_download
 import wandb
 
 
@@ -50,19 +50,6 @@ def smooth_mask(mask, sigma=1.0):
 #################################################################################
 #                             Training Helper Functions                         #
 #################################################################################
-
-@torch.no_grad()
-def update_ema(ema_model, model, decay=0.9999):
-    """
-    Step the EMA model towards the current model.
-    """
-    ema_params = OrderedDict(ema_model.named_parameters())
-    model_params = OrderedDict(model.named_parameters())
-
-    for name, param in model_params.items():
-        # TODO: Consider applying only to params that require_grad to avoid small numerical changes of pos_embed
-        ema_params[name].mul_(decay).add_(param.data, alpha=1 - decay)
-
 
 def requires_grad(model, flag=True):
     """
@@ -180,44 +167,19 @@ def main(args):
     requires_grad(first_velocity_model, False)
     
     # Note that parameter initialization is done within the DiT constructor
-    ema = deepcopy(model).to(device)  # Create an EMA of the model for use after training
-    requires_grad(ema, False)
     model = DDP(model.to(device), device_ids=[rank])
 
-    if args.vae == 'kl_f4':
-        ddconfig = {
-        'double_z': True,
-        'z_channels': 3,
-        'resolution': 256,
-        'in_channels': 1,
-        'out_ch': 1,
-        'ch': 128,
-        'ch_mult': [1,2,4],
-        'num_res_blocks': 2,
-        'attn_resolutions': [],
-        'dropout': 0.0}
-        vae = AutoencoderKL(embed_dim=3, lossconfig={'target':'ldm.modules.losses.LPIPSWithDiscriminator', 'params':{'disc_start':50001, 'disc_in_channels':1, 'kl_weight': 0.000001, 'disc_weight': 0.5}}, ddconfig=ddconfig)
-        print(vae.load_state_dict(torch.load('klf4_medical.ckpt')['state_dict'], strict=True))
 
+    if args.vae == 'kl_f4':
+        vae_model_path = hf_hub_download(repo_id="farzadbz/Medical-VAE", filename="VAE-Medical-klf4.pt")
+        vae = torch.load(vae_model_path)
         embedding_dim = 3
         compression_factor = 4
 
 
     elif args.vae == 'kl_f8':
-        ddconfig = {
-        'double_z': True,
-        'z_channels': 4,
-        'resolution': 256,
-        'in_channels': 1,
-        'out_ch': 1,
-        'ch': 128,
-        'ch_mult': [1,2,4,4],
-        'num_res_blocks': 2,
-        'attn_resolutions': [],
-        'dropout': 0.0}
-        vae = AutoencoderKL(embed_dim=4, lossconfig={'target':'ldm.modules.losses.LPIPSWithDiscriminator', 'params':{'disc_start':50001, 'disc_in_channels':1, 'kl_weight': 0.000001, 'disc_weight': 0.5}}, ddconfig=ddconfig)
-        print(vae.load_state_dict(torch.load('klf8_medical.ckpt')['state_dict'], strict=True))
-        
+        vae_model_path = hf_hub_download(repo_id="farzadbz/Medical-VAE", filename="VAE-Medical-klf8.pt")
+        vae = torch.load(vae_model_path)
         embedding_dim = 4
         compression_factor = 8
         
@@ -265,22 +227,14 @@ def main(args):
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=adjusted_epochs, eta_min=args.lr/100)
 
     # Prepare models for training:
-    update_ema(ema, model.module, decay=0)  # Ensure EMA is initialized with synced weights
-
     model.train()  # important! This enables embedding dropout for classifier-free guidance
     first_velocity_model.eval()  # important! This enables embedding dropout for classifier-free guidance
-    
-    ema.eval()  # EMA model should always be in eval mode
 
     # Variables for monitoring/logging purposes:
     train_steps = 0
     log_steps = 0
     running_loss = 0
-    running_mse = 0
-    running_mt = 0
     start_time = time()
-    best_val_aurocsp = 0
-    best_val_ap = 0
 
     logger.info(f"Training for {adjusted_epochs} epochs...")
     
@@ -320,8 +274,6 @@ def main(args):
             if (ii + 1) % accumulation_steps == 0:
                 opt.step()
                 opt.zero_grad() 
-                
-            update_ema(ema, model.module)
 
             # Log loss values:
             running_loss += loss.item()
@@ -361,7 +313,6 @@ def main(args):
                 # Save checkpoint:
                 checkpoint = {
                     "model": model.module.state_dict(),
-                    "ema": ema.state_dict(),
                     # "opt": opt.state_dict(),
                     "args": args
                 }
@@ -377,7 +328,6 @@ def main(args):
     model.eval()  # important! This disables randomized embedding dropout
     results = evaluation(model, vae, val_loader, args, logger, device=device, rank=rank)
     print(results)
-    # do any sampling/FID calculation/etc. with ema (or model) in eval mode ...
 
     logger.info("Done!")
     cleanup()
