@@ -303,7 +303,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, choices=['BraTS2021', 'ATLAS2'], default="BraTS2021")
     parser.add_argument("--model_size", type=str, choices=['UNet_XS', 'UNet_S', 'UNet_M', 'UNet_L', 'UNet_XL'], default="UNet_M")
     parser.add_argument("--image-size", type=int, choices=[128, 256, 512], default=256)
-    parser.add_argument("--modality", type=str, choices=['t1', 't1ce', 't2', 'flair'], default="t1")
+    parser.add_argument("--modality", type=str, choices=['T1', 'T2', 'FLAIR', 'T1CE'], default="T1")
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--warmup-epochs", type=int, default=0)
     parser.add_argument("--global-batch-size", type=int, default=96)

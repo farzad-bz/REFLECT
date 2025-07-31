@@ -42,10 +42,6 @@ Prepare your data as follows:
        │   ├── brain_scan_{train_image_id}_slice_{slice_idx}_{modality}.png
        │   ├── brain_scan_{train_image_id}_slice_{slice_idx}_brainmask.png
        │   └── ...
-       ├── val
-       │   ├── brain_scan_{val_image_id}_slice_{slice_idx}_{modality}.png
-       │   ├── brain_scan_{val_image_id}_slice_{slice_idx}_brainmask.png
-       │   └── ...
        └── test
            ├── brain_scan_{test_image_id}_slice_{slice_idx}_{modality}.png
            ├── brain_scan_{test_image_id}_slice_{slice_idx}_brainmask.png
@@ -92,7 +88,7 @@ torchrun train_REFLECT.py \
             --image-size 256 \
             --augmentation True \
             --vae kl_f8 \  #choices: kl_f8 & kl_f4
-            --modality t1 \  #choices: t1, t2, flair or t1ce for BraTS2021, and t1 for ATLAS2
+            --modality T1 \  #choices: T1, T2, FLAIR or T1CE for BraTS2021, and T1 for ATLAS2
             --ckpt-every 10 \ 
             --data-dir . 
 ```
