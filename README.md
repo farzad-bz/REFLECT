@@ -67,18 +67,31 @@ If you prefer to train your own VAE from scratch, please refer to the [LDM-VAE r
 
 ---
 
+## 🔗 DTD Embedding Download
+
+The training script requires a precomputed **DTD embedding** file.
+
+- **Download the DTD embeddings based on your desired vae model (klf4 or klf8)**:
+ [klf8 dtd embeddings](https://drive.google.com/file/d/1I7jmzsHxC5IBm719dNVpWl5_zGFSVsM4/view?usp=share_link).
+ [klf4 dtd embeddings](https://drive.google.com/file/d/1zTwLiI3CdJmt4vWUt65eGWY5s0OAxZzf/view?usp=share_link).
+- **Copy the downloaded file** to the directory you specify with the `--data-dir` argument.
+
+---
+
 ## 🚄 Training REFLECT
 
-To train REFLECT, run the following command. This configuration leverages a UNet_L model with data augmentation and integrates the pretrained VAE:
+To train REFLECT, run the following command. This configuration leverages a UNet_L model with data augmentation and integrates the pretrained VAE (with scale-factor 8):
 
 ```bash
 torchrun train_REFLECT.py \
-            --model UNet_L \
+            --dataset BraTS2021 \  #choices: BraTS2021 & ATLAS2
+            --model UNet_L \  #choices: UNet_XS, UNet_S, UNet_M, UNet_L, UNet_XL
             --image-size 256 \
             --augmentation True \
-            --vae kl_f8 \
-            --modality 1 \
-            --ckpt-every 0 
+            --vae kl_f8 \  #choices: kl_f8 & kl_f4
+            --modality t1 \  #choices: t1, t2, flair or t1ce for BraTS2021, and t1 for ATLAS2
+            --ckpt-every 10 \ 
+            --data-dir . 
 ```
 
 ---

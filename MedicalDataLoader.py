@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore")
 class BraTS2021Dataset(Dataset):
     """ABIDE dataset."""
 
-    def __init__(self, mode, rootdir= './Brats2021-slices', modality="T1", dtd_emb_dir='/home/ar94660/Datasets/UAD/dtd/dtd_embeddings.npy', embedding_dim=4, compression_factor=8, max_objects=4, transform=None,  normal=True, image_size=256, augment=True):
+    def __init__(self, mode, rootdir= './Brats2021-slices', modality="T1", dtd_emb_dir='./dtd_embeddings.npy', embedding_dim=4, compression_factor=8, max_objects=4, transform=None,  normal=True, image_size=256, augment=True):
         """
         Args:
             mode: 'train','val','test'
@@ -196,7 +196,7 @@ class BraTS2021Dataset(Dataset):
 class ATLASDataset(Dataset):
     """ATLAS dataset."""
 
-    def __init__(self, mode, rootdir= './ATLAS-slices', modality="T1", dtd_emb_dir='/home/ar94660/Datasets/UAD/dtd/dtd_embeddings.npy', embedding_dim=4, compression_factor=8, max_objects=4, transform=None,  normal=True, image_size=256, augment=True):
+    def __init__(self, mode, rootdir= './ATLAS-slices', modality="T1", dtd_emb_dir='./dtd_embeddings.npy', embedding_dim=4, compression_factor=8, max_objects=4, transform=None,  normal=True, image_size=256, augment=True):
         """
         Args:
             mode: 'train','val','test'
