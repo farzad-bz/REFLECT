@@ -79,10 +79,24 @@ The training script requires a precomputed **DTD embedding** file.
 
 ## 🚄 Training REFLECT
 
-To train REFLECT, run the following command. This configuration leverages a UNet_L model with data augmentation and integrates the pretrained VAE (with scale-factor 8):
+To train REFLECT-1, run the following command. This configuration leverages a UNet_L model with data augmentation and integrates the pretrained VAE (with scale-factor 8):
 
 ```bash
 torchrun train_REFLECT.py \
+            --dataset BraTS2021 \  #choices: BraTS2021 & ATLAS2
+            --model UNet_L \  #choices: UNet_XS, UNet_S, UNet_M, UNet_L, UNet_XL
+            --image-size 256 \
+            --augmentation True \
+            --vae kl_f8 \  #choices: kl_f8 & kl_f4
+            --modality T1 \  #choices: T1, T2, FLAIR or T1CE for BraTS2021, and T1 for ATLAS2
+            --ckpt-every 10 \ 
+            --data-dir . 
+```
+
+To train REFLECT-2, first ensure you have a completed REFLECT-1 run (checkpoint and outputs must exist in the same directory as your current working folder). REFLECT-2 should recieve the same input arguments as trained REFLECT-1 model. 
+
+```bash
+torchrun train_REFLECT-2.py \
             --dataset BraTS2021 \  #choices: BraTS2021 & ATLAS2
             --model UNet_L \  #choices: UNet_XS, UNet_S, UNet_M, UNet_L, UNet_XL
             --image-size 256 \
