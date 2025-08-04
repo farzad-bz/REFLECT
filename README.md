@@ -77,7 +77,7 @@ The training script requires a precomputed **DTD embedding** file.
 
 ---
 
-## 🚄 Training REFLECT
+## 🚄 Training REFLECT-1
 
 To train the REFLECT-1 model, run the following command. This example uses a UNet_M architecture and integrates a pretrained VAE (with scale factor 8) for the T1 modality of the BraTS dataset:
 
@@ -97,6 +97,11 @@ Where:
 - `--model`: `UNet_XS`, `UNet_S`, `UNet_M`, `UNet_L`, `UNet_XL`
 - `--vae`: `kl_f8` or `kl_f4`
 - `--modality`: For BraTS: `T1`, `T2`, `FLAIR`, `T1CE`; for ATLAS: `T1`
+- `--dtd-dir`: Path to the directory containing the DTD embedding file.
+- `--data-dir`: Path to the root data directory.
+
+
+## 🚄 Training REFLECT-2
 
 To train the REFLECT-2 model, first ensure you have completed REFLECT-1 training. Then, launch REFLECT-2 training as shown below.
 - Note: train_REFLECT-2.py automatically loads the required arguments from the YAML config file found in the parent directory of the specified REFLECT-1 model path, so you do not need to specify them manually:
@@ -108,7 +113,8 @@ torchrun train_REFLECT-2.py \
             --data-dir . \
             --REFLECT-1-path ./REFLECT_BraTS_UNet_M_T1_256_kl_f8/006-UNet_M-T1/checkpoints/last.pt
 ```
-
+where 
+- `--REFLECT-1-path`: Path to the trained REFLECT-1 model checkpoint.
 
 ## 🚦 Evaluating REFLECT
 
