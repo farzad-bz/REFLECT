@@ -7,22 +7,14 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import numpy as np
-from collections import OrderedDict
-import json
 from time import time
-from PIL import Image
-from copy import deepcopy
 from glob import glob
 import argparse
 import logging
 import os
-import random
 import yaml
 import torch.nn.functional as F
 
-from anomalib import metrics
-from sklearn.metrics import roc_auc_score, average_precision_score
-from skimage.transform import resize
 from scipy.ndimage import gaussian_filter
 from medical_models import UNET_models
 from transformers import get_cosine_schedule_with_warmup
@@ -30,24 +22,9 @@ from MedicalDataLoader import BraTS2021Dataset, ATLASDataset
 from huggingface_hub import hf_hub_download
 
 
-import torch.nn as nn
-
-
-def smooth_mask(mask, sigma=1.0):
-    smoothed_mask = gaussian_filter(mask, sigma=sigma)
-    return smoothed_mask
-
 #################################################################################
 #                             Training Helper Functions                         #
 #################################################################################
-
-def requires_grad(model, flag=True):
-    """
-    Set requires_grad flag for all parameters in a model.
-    """
-    for p in model.parameters():
-        p.requires_grad = flag
-
 
 def cleanup():
     """
@@ -64,7 +41,7 @@ def create_logger_and_dirs(args):
         
         os.makedirs(args.results_dir, exist_ok=True)  # Make results folder (holds all experiment subfolders)
         experiment_index = len(glob(f"{args.results_dir}/*"))
-        model_string_name = f'{args.model_size}-{args.modality}'
+        model_string_name = f'{args.model}-{args.modality}'
         args.experiment_dir = f"{args.results_dir}/{experiment_index:03d}-{model_string_name}"  # Create an experiment folder
         args.checkpoint_dir = f"{args.experiment_dir}/checkpoints"  # Stores saved model checkpoints
         os.makedirs(args.checkpoint_dir, exist_ok=True)
@@ -112,18 +89,11 @@ def main(args):
     # Setup an experiment folder:
     if rank == 0:
         
-        if not os.path.exists(f'{args.results_dir}/last_epoch.txt'):
-            with open(f'{args.results_dir}/last_epoch.txt', 'w') as f:
-                f.write('0')
-        
-        with open(f'{args.results_dir}/last_epoch.txt', 'r') as f:
-            args.last_trained_epoch = int(f.read().strip())
-            if args.last_trained_epoch != 0:
-                args.last_trained_epoch += 1
-        
-            
-        with open(f'{args.experiment_dir}/args.yml', 'w') as f:
-            yaml.dump(vars(args), f, default_flow_style=False)   
+        if os.path.exists(f'{args.results_dir}/args.yml'):
+            with open(f'{args.results_dir}/args.yml', 'r') as file:
+                config = yaml.safe_load(file)  
+                args.last_trained_epoch = int(config['last_trained_epoch'])
+
 
     # Create model:
     assert args.image_size % 8 == 0, "Image size must be divisible by 8 (for the VAE encoder)."
@@ -132,14 +102,25 @@ def main(args):
     else:
         in_channels = out_channels = 4
         
-    model = UNET_models[args.model_size](in_channels=in_channels, out_channels=out_channels)
+    model = UNET_models[args.model](in_channels=in_channels, out_channels=out_channels)
     if args.last_trained_epoch != 0 :
         try:
-            ckpt = sorted(glob(f'{args.results_dir}/*/checkpoints/best_ap.pt'))[-1]
+            ckpt = sorted(glob(f'{args.results_dir}/*/checkpoints/last.pt'))[-1]
+            state_dict = torch.load(ckpt)['model']
+            logger.info(model.load_state_dict(state_dict))
+            logger.info(f'*** A trained model found, starting from epoch {args.last_trained_epoch} ***')
         except:
-            ckpt = sorted(glob(f'{args.results_dir}/*/*/checkpoints/best_ap.pt'))[-1]
-        state_dict = torch.load(ckpt)['model']
-        logger.info(model.load_state_dict(state_dict))
+            logger.info('*** No trained model could be found, starting from epoch 0 ***')
+            args.last_trained_epoch = 0
+            pass
+
+
+    if rank == 0:
+        with open(f'{args.results_dir}/args.yml', 'w') as f:
+            yaml.dump(vars(args), f, default_flow_style=False)   
+            
+        
+        
         
     model = DDP(model.to(device), device_ids=[rank])
 
@@ -168,26 +149,19 @@ def main(args):
         transforms.Normalize(mean=[0.5], std=[0.5], inplace=True)
     ])
     
-    if args.dataset == 'BraTS2021':
-        dataset = BraTS2021Dataset('train', transform=transform, image_size=args.image_size, augment=args.augmentation, modality=args.modality, embedding_dim=embedding_dim, compression_factor=compression_factor, dtd_emb_dir=f'{args.data_dir}/dtd_embeddings_medical_{args.vae}.npy')
+    if args.dataset == 'BraTS':
+        dataset = BraTS2021Dataset('train', rootdir=args.data_dir, transform=transform, image_size=args.image_size, augment=args.augmentation, modality=args.modality, embedding_dim=embedding_dim, compression_factor=compression_factor, dtd_emb_dir=os.path.join(args.dtd_dir, f'dtd_embeddings_medical_{args.vae}.npy'))
         loader = DataLoader(dataset, batch_size=args.global_batch_size, shuffle=True, num_workers=4, drop_last=False)
-
-        val_dataset = BraTS2021Dataset('test', transform=transform, image_size=args.image_size, augment=False, modality=args.modality, embedding_dim=embedding_dim, compression_factor=compression_factor, dtd_emb_dir=f'{args.data_dir}/dtd_embeddings_medical_{args.vae}.npy')
-        val_loader = DataLoader(val_dataset, batch_size=args.global_batch_size, shuffle=False, num_workers=4, drop_last=False)
     else:
-        dataset = ATLASDataset('train', transform=transform, image_size=args.image_size, augment=args.augmentation, modality=args.modality, embedding_dim=embedding_dim, compression_factor=compression_factor, dtd_emb_dir=f'{args.data_dir}/dtd_embeddings_medical_{args.vae}.npy')
+        dataset = ATLASDataset('train', rootdir=args.data_dir, transform=transform, image_size=args.image_size, augment=args.augmentation, modality=args.modality, embedding_dim=embedding_dim, compression_factor=compression_factor, dtd_emb_dir=os.path.join(args.dtd_dir, f'dtd_embeddings_medical_{args.vae}.npy'))
         loader = DataLoader(dataset, batch_size=args.global_batch_size, shuffle=True, num_workers=4, drop_last=False)
-
-        val_dataset = ATLASDataset('test', transform=transform, image_size=args.image_size, augment=False, modality=args.modality, embedding_dim=embedding_dim, compression_factor=compression_factor, dtd_emb_dir=f'{args.data_dir}/dtd_embeddings_medical_{args.vae}.npy')
-        val_loader = DataLoader(val_dataset, batch_size=args.global_batch_size, shuffle=False, num_workers=4, drop_last=False)
-    
     
     if args.global_batch_size < 64:
         accumulation_steps = 4
     else:
         accumulation_steps = 2 
     
-    logger.info(f"Dataset contains {len(dataset):,} training images and  {len(val_dataset):,} validation images")
+    logger.info(f"Dataset contains {len(dataset):,} training images.")
 
     adjusted_epochs = args.epochs
 
@@ -198,7 +172,6 @@ def main(args):
         num_warmup_steps=args.warmup_epochs,
         num_training_steps=args.epochs*2,
     )
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=adjusted_epochs, eta_min=args.lr/100)
 
     # Prepare models for training:
     model.train()  # important! This enables embedding dropout for classifier-free guidance
@@ -240,16 +213,10 @@ def main(args):
 
             # Log loss values:
             running_loss += loss.item()
-            # running_mt += loss_dict["mt_prediction"].mean().item()
             
             log_steps += 1
             train_steps += 1
             if train_steps % args.log_every == 0:
-                # if rank == 0: 
-                #     if (not new_job_submitted) and ((time() - job_starting_time) > 10000):
-                #         new_job_submitted = True 
-                #         os.system(f'sbatch train_job_{args.dataset}_{args.center_size}.sh')
-                
                 # Measure training speed:
                 torch.cuda.synchronize()
                 end_time = time()
@@ -279,8 +246,9 @@ def main(args):
                 checkpoint_path = f"{args.checkpoint_dir}/last.pt"
                 torch.save(checkpoint, checkpoint_path)
                 logger.info(f"Saved checkpoint to {checkpoint_path}")
-                with open(f'{args.results_dir}/last_epoch.txt', 'w') as f:
-                    f.write(str(epoch))
+                with open(f'{args.results_dir}/args.yml', 'w') as f:
+                    args.last_trained_epoch = epoch+1
+                    yaml.dump(vars(args), f, default_flow_style=False)  
 
             dist.barrier()
             
@@ -291,9 +259,9 @@ def main(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, choices=['BraTS2021', 'ATLAS2'], default="BraTS2021")
-    parser.add_argument("--model_size", type=str, choices=['UNet_XS', 'UNet_S', 'UNet_M', 'UNet_L', 'UNet_XL'], default="UNet_L")
-    parser.add_argument("--image-size", type=int, choices=[128, 256, 512], default=256)
+    parser.add_argument("--dataset", type=str, choices=['BraTS', 'ATLAS'], default="BraTS")
+    parser.add_argument("--model", type=str, choices=['UNet_XS', 'UNet_S', 'UNet_M', 'UNet_L', 'UNet_XL'], default="UNet_L")
+    parser.add_argument("--image-size", type=int, choices=[128, 256], default=256)
     parser.add_argument("--modality", type=str, choices=['T1', 'T2', 'FLAIR', 'T1CE'], default="T1")
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--warmup-epochs", type=int, default=5)
@@ -305,11 +273,12 @@ if __name__ == "__main__":
     parser.add_argument("--ckpt-every", type=int, default=10)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--local-rank", type=int, default=0)
-    parser.add_argument("--data_dir", type=bool, default='.')
-    parser.add_argument("--augmentation", type=bool, default=False)
+    parser.add_argument("--data-dir", type=str, default='.')
+    parser.add_argument("--dtd-dir", type=str, default='.')
+    parser.add_argument("--augmentation", type=lambda v: True if v.lower() in ('yes','true','t','y','1') else False, default=True)
     parser.add_argument("--max-objects", type=int, default=4)
 
     args = parser.parse_args()
     args.last_trained_epoch = 0
-    args.results_dir = f"./results_Medical-REFLECT_{args.dataset}_{args.model_size}_{args.modality}_{args.image_size}_{args.vae}"
+    args.results_dir = f"./REFLECT_{args.dataset}_{args.model}_{args.modality}_{args.image_size}_{args.vae}"
     main(args)

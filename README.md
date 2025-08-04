@@ -39,13 +39,13 @@ Prepare your data as follows:
    ```
    ├── Data
        ├── train
-       │   ├── brain_scan_{train_image_id}_slice_{slice_idx}_{modality}.png
-       │   ├── brain_scan_{train_image_id}_slice_{slice_idx}_brainmask.png
+       │   ├── {train_image_id}_slice_{slice_idx}_{modality}.png
+       │   ├── {train_image_id}_slice_{slice_idx}_brainmask.png
        │   └── ...
        └── test
-           ├── brain_scan_{test_image_id}_slice_{slice_idx}_{modality}.png
-           ├── brain_scan_{test_image_id}_slice_{slice_idx}_brainmask.png
-           ├── brain_scan_{test_image_id}_slice_{slice_idx}_segmentation.png
+           ├── {test_image_id}_slice_{slice_idx}_{modality}.png
+           ├── {test_image_id}_slice_{slice_idx}_brainmask.png
+           ├── {test_image_id}_slice_{slice_idx}_segmentation.png
            └── ...
    ```
 
@@ -73,38 +73,52 @@ The training script requires a precomputed **DTD embedding** file.
  
   - [klf4 dtd embeddings](https://drive.google.com/file/d/1zTwLiI3CdJmt4vWUt65eGWY5s0OAxZzf/view?usp=share_link).
 
-- **Copy the downloaded file** to the directory you specify with the `--data-dir` argument.
+- **Copy the downloaded file** to the directory you specify with the `--dtd-dir` argument.
 
 ---
 
 ## 🚄 Training REFLECT
 
-To train REFLECT-1, run the following command. This configuration leverages a UNet_L model with data augmentation and integrates the pretrained VAE (with scale-factor 8):
+To train the REFLECT-1 model, run the following command. This example uses a UNet_M architecture and integrates a pretrained VAE (with scale factor 8) for the T1 modality of the BraTS dataset:
 
 ```bash
 torchrun train_REFLECT.py \
-            --dataset BraTS2021 \  #choices: BraTS2021 & ATLAS2
-            --model UNet_L \  #choices: UNet_XS, UNet_S, UNet_M, UNet_L, UNet_XL
+            --dataset BraTS \
+            --model UNet_M \
             --image-size 256 \
-            --augmentation True \
-            --vae kl_f8 \  #choices: kl_f8 & kl_f4
-            --modality T1 \  #choices: T1, T2, FLAIR or T1CE for BraTS2021, and T1 for ATLAS2
-            --ckpt-every 10 \ 
-            --data-dir . 
+            --vae kl_f8 \
+            --modality T1 \
+            --dtd-dir . \
+            --data-dir .
+            
 ```
+Where:
+- `--dataset`: `BraTS` or `ATLAS`
+- `--model`: `UNet_XS`, `UNet_S`, `UNet_M`, `UNet_L`, `UNet_XL`
+- `--vae`: `kl_f8` or `kl_f4`
+- `--modality`: For BraTS: `T1`, `T2`, `FLAIR`, `T1CE`; for ATLAS: `T1`
 
-To train REFLECT-2, first ensure you have a completed REFLECT-1 run (checkpoint and outputs must exist in the same directory as your current working folder). REFLECT-2 should recieve the same input arguments as trained REFLECT-1 model. 
+To train the REFLECT-2 model, first ensure you have completed REFLECT-1 training. Then, launch REFLECT-2 training as shown below.
+- Note: train_REFLECT-2.py automatically loads the required arguments from the YAML config file found in the parent directory of the specified REFLECT-1 model path, so you do not need to specify them manually:
+
 
 ```bash
 torchrun train_REFLECT-2.py \
-            --dataset BraTS2021 \  #choices: BraTS2021 & ATLAS2
-            --model UNet_L \  #choices: UNet_XS, UNet_S, UNet_M, UNet_L, UNet_XL
-            --image-size 256 \
-            --augmentation True \
-            --vae kl_f8 \  #choices: kl_f8 & kl_f4
-            --modality T1 \  #choices: T1, T2, FLAIR or T1CE for BraTS2021, and T1 for ATLAS2
-            --ckpt-every 10 \ 
-            --data-dir . 
+            --dtd-dir . \
+            --data-dir . \
+            --REFLECT-1-path ./REFLECT_BraTS_UNet_M_T1_256_kl_f8/006-UNet_M-T1/checkpoints/last.pt
+```
+
+
+## 🚦 Evaluating REFLECT
+
+To evaluate a trained REFLECT model, use the following command.
+Note: evaluate_REFLECT.py also loads its configuration and arguments from the YAML file located in the parent directory of the given model checkpoint path. The script computes four evaluation metrics and saves per-image visualizations in the parent folder of the model path:
+
+```bash
+torchrun evaluate_REFLECT.py \
+            --data-dir . \
+            --model-path ./REFLECT_BraTS_UNet_M_T1_256_kl_f8/006-UNet_M-T1/checkpoints/last.pt
 ```
 
 ---

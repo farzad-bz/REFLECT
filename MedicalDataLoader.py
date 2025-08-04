@@ -36,7 +36,10 @@ class BraTS2021Dataset(Dataset):
         self.compression_factor = compression_factor
         self.embedding_size = image_size // compression_factor 
         self.max_objects = max_objects
-        self.dtd_embeddings = np.load(dtd_emb_dir)
+        if mode=='train':
+            self.dtd_embeddings = np.load(dtd_emb_dir)
+        else:
+            self.dtd_embeddings = None
         
         self.image_paths = glob(os.path.join(rootdir, mode, f'*-{modality.lower()}.png'))
         self.mask_paths = [path.replace(f'-{modality.lower()}', '-brainmask') for path  in self.image_paths]
@@ -215,7 +218,10 @@ class ATLASDataset(Dataset):
         self.compression_factor = compression_factor
         self.embedding_size = image_size // compression_factor 
         self.max_objects = max_objects
-        self.dtd_embeddings = np.load(dtd_emb_dir)
+        if mode=='train':
+            self.dtd_embeddings = np.load(dtd_emb_dir)
+        else:
+            self.dtd_embeddings = None
         
         self.image_paths = glob(os.path.join(rootdir, mode, f'*_{modality.lower()}.png'))
         self.mask_paths = [path.replace(f'_{modality.lower()}', '_brainmask') for path  in self.image_paths]
