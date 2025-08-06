@@ -94,9 +94,9 @@ torchrun train_REFLECT.py \
 ```
 Where:
 - `--dataset`: `BraTS` or `ATLAS`
-- `--model`: `UNet_XS`, `UNet_S`, `UNet_M`, `UNet_L`, `UNet_XL`
+- `--model`: `UNet_XS`, `UNet_S`, `UNet_M`, `UNet_L`, or `UNet_XL`
 - `--vae`: `kl_f8` or `kl_f4`
-- `--modality`: For BraTS: `T1`, `T2`, `FLAIR`, `T1CE`; for ATLAS: `T1`
+- `--modality`: For BraTS: `T1`, `T2`, `FLAIR`, or `T1CE`; for ATLAS: `T1`
 - `--dtd-dir`: Path to the directory containing the DTD embedding file.
 - `--data-dir`: Path to the root data directory.
 
