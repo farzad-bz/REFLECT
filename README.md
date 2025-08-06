@@ -130,14 +130,12 @@ where
 - `--model-path`: Path to the trained model checkpoint (either REFLECT-1 or REFLECT-2).
 
 ---
-
 ## 📸 Sample Results
 
 
 ![Sample Results](./assets/results.png)
 
 ---
-
 ## 📚 Citation & Reference
 
 If you find REFLECT useful in your research, please cite our work:
