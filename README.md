@@ -39,13 +39,13 @@ Prepare your data as follows:
    ```
    ├── Data
        ├── train
-       │   ├── {train_image_id}_slice_{slice_idx}_{modality}.png
-       │   ├── {train_image_id}_slice_{slice_idx}_brainmask.png
+       │   ├── {train_image_id}-slice_{slice_idx}-{modality}.png
+       │   ├── {train_image_id}-slice_{slice_idx}-brainmask.png
        │   └── ...
        └── test
-           ├── {test_image_id}_slice_{slice_idx}_{modality}.png
-           ├── {test_image_id}_slice_{slice_idx}_brainmask.png
-           ├── {test_image_id}_slice_{slice_idx}_segmentation.png
+           ├── {test_image_id}-slice_{slice_idx}-{modality}.png
+           ├── {test_image_id}-slice_{slice_idx}-brainmask.png
+           ├── {test_image_id}-slice_{slice_idx}-segmentation.png
            └── ...
    ```
 

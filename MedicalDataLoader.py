@@ -41,11 +41,11 @@ class BraTS2021Dataset(Dataset):
         else:
             self.dtd_embeddings = None
         
-        self.image_paths = glob(os.path.join(rootdir, mode, f'*-{modality.lower()}.png'))
-        self.mask_paths = [path.replace(f'-{modality.lower()}', '-brainmask') for path  in self.image_paths]
+        self.image_paths = glob(os.path.join(rootdir, mode, f'*-{modality}.png'))
+        self.mask_paths = [path.replace(f'-{modality}', '-brainmask') for path  in self.image_paths]
         
         if mode=='val' or mode=='test':
-            self.seg_paths = [path.replace(f'-{modality.lower()}', '-seg') for path  in self.image_paths]
+            self.seg_paths = [path.replace(f'-{modality}', '-segmentation') for path  in self.image_paths]
               
         if self.augment:
            self.aug = A.Compose([
@@ -124,7 +124,7 @@ class BraTS2021Dataset(Dataset):
             return img, replacement, mask
         else:
             seg = np.array(Image.open(self.seg_paths[index]).convert('L').resize((self.image_size, self.image_size))).astype(np.uint8)
-            return img, seg.astype(np.float32)
+            return img, mask, seg.astype(np.float32)
             
    
 
@@ -223,11 +223,11 @@ class ATLASDataset(Dataset):
         else:
             self.dtd_embeddings = None
         
-        self.image_paths = glob(os.path.join(rootdir, mode, f'*_{modality.lower()}.png'))
-        self.mask_paths = [path.replace(f'_{modality.lower()}', '_brainmask') for path  in self.image_paths]
+        self.image_paths = glob(os.path.join(rootdir, mode, f'*-{modality}.png'))
+        self.mask_paths = [path.replace(f'-{modality}', '-brainmask') for path  in self.image_paths]
         
         if mode=='val' or mode=='test':
-            self.seg_paths = [path.replace(f'_{modality.lower()}', '_segmentation') for path  in self.image_paths]
+            self.seg_paths = [path.replace(f'-{modality}', '-segmentation') for path  in self.image_paths]
               
         if self.augment:
            self.aug = A.Compose([
@@ -290,9 +290,6 @@ class ATLASDataset(Dataset):
                     noise_base = np.random.randn(self.embedding_dim).reshape(self.embedding_dim, 1, 1)
                     noise_additive = np.random.randn(self.embedding_dim, self.embedding_size, self.embedding_size).astype(np.float32)
                     noise = np.sqrt(alpha)*noise_base + np.sqrt(1-alpha)*noise_additive
-                    # print('mask', mask.shape)
-                    # print('noise', noise.shape)
-                    # print('replacement', replacement.shape)
                     if (mask==(j)).any():
                         # print(mask==(j)))
                         replacement[mask==(j)] = noise[mask==(j)]
@@ -306,7 +303,7 @@ class ATLASDataset(Dataset):
             return img, replacement, mask
         else:
             seg = np.array(Image.open(self.seg_paths[index]).convert('L').resize((self.image_size, self.image_size))).astype(np.uint8)
-            return img, seg.astype(np.float32)
+            return img, mask, seg.astype(np.float32)
             
             
    

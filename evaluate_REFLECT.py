@@ -25,9 +25,13 @@ def smooth_mask(mask, sigma=1.0):
 
 def compute_dice(anomaly_map, segmentation, th):
     anomaly_map[anomaly_map>th]=1
-    if sum(segmentation.flatten())==0:
-        return np.nan
     anomaly_map[anomaly_map<1]=0
+    if sum(segmentation.flatten())==0:
+        if sum(anomaly_map.flatten())==0:
+            return 1
+        else:
+            return 0
+    
     eps = 1e-6
     # flatten label and prediction tensors
     inputs = anomaly_map.flatten()
@@ -47,8 +51,8 @@ def dsc_max(anomaly_maps, segmentations):
         for k in range(len(anomaly_maps)):
             dice = compute_dice(copy.deepcopy(np.asarray(anomaly_maps[k]).flatten()), copy.deepcopy(np.asarray(segmentations[k]).flatten()), dice_threshold)
             dice_scores.append(dice)
-        if np.nanmean(dice_scores) > best_dsc:
-            best_dsc = np.nanmean(dice_scores)
+        if np.mean(dice_scores) > best_dsc:
+            best_dsc = np.mean(dice_scores)
     return best_dsc 
     
     
@@ -74,16 +78,16 @@ def visualize(anomaly_maps, segmentations, xs,  image_samples, args):
         os.makedirs(os.path.join(args.parent_dir, f'visualization/{args.backward_steps}_backward_steps/'), exist_ok=True)
         for anomaly_map, segmentation, x,  image_samples in zip(anomaly_maps, segmentations, xs,  image_samples):
                 counter+=1
-                visualization_image = np.zeros((1024, 256, 3)).astype(np.uint8)
+                visualization_image = np.zeros((4*args.image_size, args.image_size, 3)).astype(np.uint8)
                 input_image = ((np.clip(x[0].detach().cpu().numpy(), -1, 1).transpose(1,2,0))*127.5+127.5).astype(np.uint8)
                 output_image = ((np.clip(image_samples[0].detach().cpu().numpy(), -1, 1).transpose(1,2,0))*127.5+127.5).astype(np.uint8)
 
                 scoremap = cv2.applyColorMap((anomaly_map*255).astype(np.uint8), cv2.COLORMAP_JET)[:,:,::-1]
                 anomal_map_img = (0.5 * input_image + (1 - 0.5) * scoremap).astype(np.uint8)
-                visualization_image[:256, :] = input_image
-                visualization_image[256:512, :] = output_image
-                visualization_image[512:768, :] = np.repeat(segmentation.cpu().numpy(), 3, axis=0).transpose([1,2,0])
-                visualization_image[768:, :] = anomal_map_img
+                visualization_image[:args.image_size, :] = input_image
+                visualization_image[args.image_size:2*args.image_size, :] = output_image
+                visualization_image[2*args.image_size:3*args.image_size, :] = np.repeat(segmentation.cpu().numpy(), 3, axis=0).transpose([1,2,0])
+                visualization_image[3*args.image_size:, :] = anomal_map_img
                 Image.fromarray(visualization_image).save(os.path.join(args.parent_dir, f'visualization/{args.backward_steps}_backward_steps/{counter}.png'))
 
 
@@ -183,7 +187,7 @@ def main(args):
     print('=-='*20)
     print('Starting evaluation...')
     print('=-='*20)
-    for ii, (x, seg) in enumerate(test_loader):
+    for ii, (x, mask, seg) in enumerate(test_loader):
         with torch.no_grad():
             # Map input images to latent space + normalize latents:
             encoded = vae.encode(x.to(device)).mean.mul_(0.18215)#Normalization params got from LDM package
