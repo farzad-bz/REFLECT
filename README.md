@@ -124,7 +124,7 @@ Note: evaluate_REFLECT.py also loads its configuration and arguments from the YA
 ```bash
 torchrun evaluate_REFLECT.py \
             --data-dir . \
-            --model-path ./REFLECT_BraTS_UNet_M_T1_256_kl_f8/006-UNet_M-T1/checkpoints/last.pt
+            --model-path ./REFLECT_BraTS_UNet_M_T1_256_kl_f8/001-UNet_M-T1/checkpoints/last.pt
 ```
 where 
 - `--model-path`: Path to the trained model checkpoint (either REFLECT-1 or REFLECT-2).
