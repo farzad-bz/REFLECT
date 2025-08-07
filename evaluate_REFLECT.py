@@ -104,7 +104,7 @@ def evaluate(x0s, segmentations, encodeds,  image_samples, latent_samples, args)
                 latent_difference = (((((torch.abs(latent_sample-encoded))).to(torch.float32)).mean(axis=0)).detach().cpu().numpy().transpose(1,2,0).mean(axis=2))
                 latent_difference = (np.clip(latent_difference, 0.0 , 0.4)) * 2.5
                 latent_difference = smooth_mask(latent_difference, sigma=1)
-                latent_difference = resize(latent_difference, (256, 256))
+                latent_difference = resize(latent_difference, (args.image_size, args.image_size))
                 
                 final_anomaly = 1/2*image_difference + 1/2*latent_difference
                 anomaly_maps.append(final_anomaly)
