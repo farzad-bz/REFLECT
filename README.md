@@ -143,7 +143,7 @@ If you find REFLECT useful in your research, please cite our work:
 ```bibtex
 @article{beizaee2025reflect,
   title={REFLECT: Rectified Flows for Efficient Brain Anomaly Correction Transport},
-  author={Beizaee, Farzad and Hajimiri, Sina and Ben Ayed, Ismail and Lodygensky, Gregory and Desrosiers, Christian and Dolz, Jose},
+  author={Beizaee, Farzad and Hajimiri, Sina and Ayed, Ismail Ben and Lodygensky, Gregory and Desrosiers, Christian and Dolz, Jose},
   journal={arXiv preprint arXiv:2508.02889},
   year={2025}
 }
